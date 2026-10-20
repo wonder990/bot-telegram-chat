@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel · UDABOL Oruro</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+<header class="barra">
+  <div class="tit"><div class="sello" aria-hidden="true">U</div><h1>UDABOL Oruro · Asistente del estudiante</h1></div>
+  <div class="usuario"><img id="foto" alt="" hidden><span id="nombre"></span><button class="salir" id="salir">Cerrar sesión</button></div>
+</header>
+<div class="aviso" id="aviso" role="status"></div>
+<div class="layout">
+  <section class="card chat">
+    <h3>Chat</h3>
+    <div class="msgs" id="msgs"><div class="m bot">Hola. Escribe un comando (/horario) o pregúntame lo que quieras: responde Gemini.</div></div>
+    <div class="atajos">
+      <button data-c="/horario">/horario</button><button data-c="/agenda">/agenda</button><button data-c="/proxima">/proxima</button>
+      <button data-c="/reportes">/reportes</button><button data-c="/docentes">/docentes</button>
+    </div>
+    <div class="enviar">
+      <input id="texto" placeholder="Comando o pregunta…" autocomplete="off" aria-label="Comando">
+      <button id="btn">Enviar</button>
+    </div>
+  </section>
+  <section class="paneles">
+    <div class="card"><h3>Horario semanal</h3><div class="scroll" id="horario"><p class="vacio">Escribe /horario para ver tus clases.</p></div></div>
+    <div class="card"><h3>Agenda: tareas y exámenes</h3><div id="agenda"><p class="vacio">Agrega con /tarea o /examen y mira la lista con /agenda.</p></div></div>
+    <div class="dos">
+      <div class="card"><h3>Materia</h3><div id="aula"><p class="vacio">Usa /aula seguido de la materia.</p></div></div>
+      <div class="card"><h3>Reportes</h3><div id="reportes"><p class="vacio">Envía uno con /reporte y tu texto.</p></div></div>
+    </div>
+    <div class="card"><h3>Docentes</h3><div id="docentes"><p class="vacio">Escribe /docentes para ver nombres y contactos.</p></div></div>
+  </section>
+</div>
+<script type="module">
+import { auth, cerrarSesion } from "/static/firebase.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let socket, usuario;
+
+onAuthStateChanged(auth, async u => {
+  if (!u) { location.href = "/"; return; }
+  usuario = u;
+  $("nombre").textContent = u.displayName || u.email;
+  if (u.photoURL) { $("foto").src = u.photoURL; $("foto").hidden = false; }
+  iniciarSocket(await u.getIdToken());
+});
+$("salir").onclick = () => cerrarSesion();
+
+function iniciarSocket(token) {
+  socket = io();
+  // Se identifica al usuario; el servidor puede verificar el token con firebase-admin
+  socket.on("connect", () => socket.emit("identificar", { uid: usuario.uid, nombre: usuario.displayName, token }));
+  socket.on("respuesta", t => { document.querySelectorAll(".pensando").forEach(e => e.remove()); burbuja(t, "bot"); });
+  socket.on("accion", a => acciones[a.tipo]?.(a.datos));
+}
+
+function burbuja(t, quien) {
+  const d = document.createElement("div");
+  d.className = "m " + quien; d.textContent = t;
+  $("msgs").appendChild(d); $("msgs").scrollTop = $("msgs").scrollHeight;
+}
+function enviar(t) {
+  t = t.trim(); if (!t || !socket) return;
+  burbuja(t, "yo"); socket.emit("mensaje", t);
+  if (!t.startsWith("/")) { burbuja("Gemini está pensando…", "bot"); $("msgs").lastChild.classList.add("pensando"); }
+}
+$("btn").onclick = () => { enviar($("texto").value); $("texto").value = ""; };
+$("texto").addEventListener("keydown", e => { if (e.key === "Enter") $("btn").click(); });
+document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => enviar(b.dataset.c));
+
+const acciones = {
+  horario(filas) {
+    $("horario").innerHTML = "<table><tr><th>Día</th><th>Hora</th><th>Materia</th><th>Aula</th><th>Docente</th></tr>" +
+      filas.map(f => `<tr data-k="${esc(f.materia)}|${esc(f.dia)}"><td>${esc(f.dia)}</td><td>${esc(f.hora)}</td><td>${esc(f.materia)}</td><td>${esc(f.aula)}</td><td>${esc(f.docente)}</td></tr>`).join("") + "</table>";
+  },
+  proxima(c) {
+    document.querySelectorAll("#horario tr.sig").forEach(r => r.classList.remove("sig"));
+    document.querySelector(`#horario tr[data-k="${CSS.escape(c.materia + "|" + c.dia)}"]`)?.classList.add("sig");
+  },
+  aula(c) {
+    $("aula").innerHTML = `<p class="tarj"><b>${esc(c.materia)}</b><small>Aula ${esc(c.aula)} · ${esc(c.dia)} ${esc(c.hora)}</small><small>${esc(c.docente)}</small></p>`;
+  },
+  reportes(lista) {
+    $("reportes").innerHTML = lista.length ? lista.map(r =>
+      `<p class="tarj"><b>#${esc(r.id)}</b> <span class="estado ${esc(r.estado)}">${esc(r.estado)}</span> ${esc(r.texto)}<small>${esc(r.fecha)}</small></p>`).join("")
+      : '<p class="vacio">Aún no hay reportes.</p>';
+  },
+  docentes(lista) {
+    $("docentes").innerHTML = lista.map(d =>
+      `<p class="tarj"><b>${esc(d.nombre)}</b><small>${esc(d.materia)}</small><small>${esc(d.correo)}${d.celular ? " · " + esc(d.celular) : ""}</small></p>`).join("");
+  },
+  agenda(lista) {
+    $("agenda").innerHTML = lista.length ? lista.map(x =>
+      `<p class="tarj ${esc(x.tipo)}"><b>${esc(x.tipo)} #${esc(x.id)}</b> ${esc(x.texto)}<small>${esc(x.fecha)} · faltan ${esc(x.falta)}</small></p>`).join("")
+      : '<p class="vacio">No tienes pendientes.</p>';
+  },
+  recordatorio(t) { const a = $("aviso"); a.textContent = "Recordatorio: " + t; a.classList.add("on"); setTimeout(() => a.classList.remove("on"), 15000); }
+};
+</script>
+</body>
+</html>

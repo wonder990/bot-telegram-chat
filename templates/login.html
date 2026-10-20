@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Asistente universitario · UDABOL Oruro</title>
+    <link rel="stylesheet" href="../static/style.css" />
+  </head>
+  <body>
+    <main class="login">
+      <section class="marca">
+        <div class="sello" aria-hidden="true">U</div>
+        <div>
+          <h1>Tu vida universitaria, en un chat</h1>
+          <p>
+            Consulta tu horario, tus docentes y envía reportes desde la web o
+            desde Telegram.
+          </p>
+        </div>
+        <p>
+          Universidad de Aquino Bolivia · Sede Oruro · Ingeniería de Sistemas
+        </p>
+      </section>
+      <section class="acceso">
+        <div class="acceso-caja">
+          <h2>Iniciar sesión</h2>
+          <p>Entra con tu cuenta para usar el asistente.</p>
+          <button class="btn-social" data-p="google">
+            <b class="g">G</b> Continuar con Google
+          </button>
+          <button class="btn-social" data-p="facebook">
+            <b class="f">f</b> Continuar con Facebook
+          </button>
+          <div class="error" id="error" role="alert"></div>
+        </div>
+      </section>
+    </main>
+    <script type="module">
+      import { auth, proveedores } from "/static/firebase.js";
+      import {
+        signInWithPopup,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+      onAuthStateChanged(auth, (u) => {
+        if (u) location.href = "/panel";
+      });
+
+      document.querySelectorAll("[data-p]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          try {
+            await signInWithPopup(auth, proveedores[b.dataset.p]);
+          } catch (e) {
+            document.getElementById("error").textContent =
+              "No se pudo iniciar sesión (" + e.code + "). Intenta de nuevo.";
+          }
+        }),
+      );
+    </script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+# Secretos: NUNCA subir
+.env
+*firebase-adminsdk*.json
+serviceAccount*.json
+
+# Datos generados al usar el bot
+agenda.json
+reportes.json
+
+# Archivos sueltos
+files.zip
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Editor y sistema
+.vscode/
+.DS_Store

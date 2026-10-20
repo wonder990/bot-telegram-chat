@@ -1,0 +1,15 @@
+{
+  "horario": [
+    {"dia": "lunes", "hora": "08:00", "materia": "Programación Avanzada II", "aula": "12", "docente": "Docente de ejemplo 1"},
+    {"dia": "martes", "hora": "10:00", "materia": "Redes de Computadoras", "aula": "8", "docente": "Docente de ejemplo 2"},
+    {"dia": "miercoles", "hora": "08:00", "materia": "Base de Datos", "aula": "Lab 2", "docente": "Docente de ejemplo 3"},
+    {"dia": "jueves", "hora": "10:00", "materia": "Programación Avanzada II", "aula": "Lab 1", "docente": "Docente de ejemplo 1"},
+    {"dia": "viernes", "hora": "08:00", "materia": "Ingeniería de Software", "aula": "5", "docente": "Docente de ejemplo 4"}
+  ],
+  "docentes": [
+    {"nombre": "Docente de ejemplo 1", "materia": "Programación Avanzada II", "correo": "docente1@ejemplo.com", "celular": ""},
+    {"nombre": "Docente de ejemplo 2", "materia": "Redes de Computadoras", "correo": "docente2@ejemplo.com", "celular": ""},
+    {"nombre": "Docente de ejemplo 3", "materia": "Base de Datos", "correo": "docente3@ejemplo.com", "celular": ""},
+    {"nombre": "Docente de ejemplo 4", "materia": "Ingeniería de Software", "correo": "docente4@ejemplo.com", "celular": ""}
+  ]
+}

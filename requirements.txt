@@ -1,0 +1,6 @@
+flask
+flask-socketio
+requests
+python-dotenv
+google-genai
+firebase-admin
