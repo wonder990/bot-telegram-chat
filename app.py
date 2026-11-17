@@ -3,7 +3,7 @@ import json, os, threading, time, unicodedata
 from datetime import datetime, timedelta, timezone
 import requests
 from dotenv import load_dotenv
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
 load_dotenv()
@@ -103,7 +103,7 @@ def c_reporte(args, quien):
         return "Uso: /reporte texto  (ejemplo: /reporte El proyector del aula 12 no funciona)", []
     with candado:
         lista = cargar("reportes.json", [])
-        r = {"id": len(lista) + 1, "texto": args, "autor": quien,
+        r = {"id": max((x.get("id", 0) for x in lista), default=0) + 1, "texto": args, "autor": quien,
              "fecha": datetime.now(BOLIVIA).strftime("%d/%m/%Y %H:%M"), "estado": "Pendiente"}
         lista.append(r)
         guardar("reportes.json", lista)
@@ -303,7 +303,11 @@ def recibir_telegram():
                 if not texto or not chat:
                     continue
                 quien = m.get("from", {}).get("first_name", "Telegram")
-                resp, acciones = ejecutar_comando(texto, quien, "telegram", chat=chat)
+                try:
+                    resp, acciones = ejecutar_comando(texto, quien, "telegram", chat=chat)
+                except Exception as e:
+                    print("Error en comando Telegram:", texto, e)
+                    resp, acciones = "Ocurrió un error con ese comando. Intenta de nuevo.", []
                 enviar_telegram(chat, resp)
                 for tipo, datos in acciones:  # el panel web también se actualiza
                     socket.emit("accion", {"tipo": tipo, "datos": datos})
@@ -326,20 +330,36 @@ def panel():
 
 @socket.on("identificar")
 def identificar(d):
-    # Pendiente (opcional): verificar d["token"] con firebase-admin
-    usuarios[request_sid()] = d.get("nombre") or "Estudiante"
+    nombre = d.get("nombre")
+    if db:  # firebase-admin inicializado: se verifica el token de la sesión
+        try:
+            from firebase_admin import auth as fb_auth
+            info = fb_auth.verify_id_token(d.get("token") or "")
+            nombre = info.get("name") or info.get("email") or nombre
+        except Exception as e:
+            print("Token Firebase inválido:", e)
+            emit("respuesta", "Sesión no verificada. Vuelve a iniciar sesión.")
+            return
+    usuarios[request.sid] = nombre or "Estudiante"
+
+@socket.on("disconnect")
+def desconectado():
+    usuarios.pop(request.sid, None)
 
 @socket.on("mensaje")
 def recibir_mensaje(texto):
-    sid = request_sid()
+    sid = request.sid
     quien = usuarios.get(sid, "Web")
-    resp, acciones = ejecutar_comando(texto, quien, "web", sid=sid)
+    try:
+        resp, acciones = ejecutar_comando(texto, quien, "web", sid=sid)
+    except Exception as e:
+        print("Error en comando web:", texto, e)
+        resp, acciones = "Ocurrió un error con ese comando. Intenta de nuevo.", []
     emit("respuesta", resp)
     for tipo, datos in acciones:
         socket.emit("accion", {"tipo": tipo, "datos": datos}, to=sid if tipo != "reportes" else None)
 
 def request_sid():
-    from flask import request
     return request.sid
 
 if __name__ == "__main__":
